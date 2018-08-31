@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include "paddle/fluid/framework/ir/pass.h"
 #include "paddle/fluid/inference/api/paddle_inference_api.h"
+#include "paddle/fluid/platform/profiler.h"
 
 DEFINE_string(infer_model, "", "Directory of the inference model.");
 DEFINE_string(infer_data, "", "Path of the dataset.");
@@ -58,6 +59,11 @@ void Main(int batch_size) {
   auto predictor =
       CreatePaddlePredictor<AnalysisConfig, PaddleEngineKind::kAnalysis>(
           config);
+  // Profile the performance
+  paddle::platform::ProfilerState state;
+  state = paddle::platform::ProfilerState::kCPU;
+  // Enable the profiler
+  paddle::platform::EnableProfiler(state);
 
   std::vector<PaddleTensor> output_slots;
   for (int i = 0; i < FLAGS_repeat; i++) {
@@ -77,6 +83,10 @@ void Main(int batch_size) {
     LOG(INFO) << "output.data summary: " << ss.str();
   }
   // one batch ends
+  // Disable the profiler and print the timing information
+  paddle::platform::DisableProfiler(
+      paddle::platform::EventSortingKey::kDefault, "run_inference_profiler");
+  paddle::platform::ResetProfiler();
 }
 
 TEST(text_classification, basic) { Main(FLAGS_batch_size); }
