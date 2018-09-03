@@ -85,7 +85,7 @@ void Main(int batch_size) {
   // one batch ends
   // Disable the profiler and print the timing information
   paddle::platform::DisableProfiler(
-      paddle::platform::EventSortingKey::kDefault, "run_inference_profiler");
+      paddle::platform::EventSortingKey::kTotal, "run_inference_profiler");
   paddle::platform::ResetProfiler();
 }
 
