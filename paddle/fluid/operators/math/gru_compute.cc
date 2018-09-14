@@ -13,6 +13,8 @@ limitations under the License. */
 #include "paddle/fluid/operators/math/blas.h"
 #include "paddle/fluid/operators/math/detail/gru_cpu_kernel.h"
 #include "paddle/fluid/operators/math/detail/gru_kernel.h"
+#include <ctime>
+std::vector<double> time_c(4,0);
 
 namespace paddle {
 namespace operators {
@@ -26,24 +28,45 @@ struct GRUUnitFunctor<platform::CPUDeviceContext, T> {
                       const detail::ActivationType active_gate) {
 #ifndef __NVCC__
     auto blas = math::GetBlas<platform::CPUDeviceContext, T>(context);
+    double step2, step3, step4, step5;
+    //step 2
+    clock_t begin2 = clock();
     if (value.prev_out_value) {
       blas.GEMM(false, false, batch_size, frame_size * 2, frame_size, 1,
                 value.prev_out_value, frame_size, value.gate_weight,
                 frame_size * 2, 1, value.gate_value, frame_size * 3);
     }
-
+    clock_t end2 = clock();
+    step2 = double(end2 - begin2) / CLOCKS_PER_SEC;
+    time_c[0] += step2;
+    
+    //step 3
+    clock_t begin3 = clock();
     detail::forward_reset_output(detail::forward::gru_resetOutput<T>(), value,
                                  frame_size, batch_size, active_gate);
+    clock_t end3 = clock();
+    step3 = double(end3 - begin3) / CLOCKS_PER_SEC;
+    time_c[1] += step3;
 
+    //step 4
+    clock_t begin4 = clock();
     if (value.prev_out_value) {
       blas.GEMM(false, false, batch_size, frame_size, frame_size, 1,
                 value.reset_output_value, frame_size, value.state_weight,
                 frame_size, 1, value.gate_value + frame_size * 2,
                 frame_size * 3);
     }
+    clock_t end4 = clock();    
+    step4 = double(end4 - begin4) / CLOCKS_PER_SEC;
+    time_c[2] += step4;
 
+    //step 5
+    clock_t begin5 = clock();
     detail::forward_final_output(detail::forward::gru_finalOutput<T>(), value,
                                  frame_size, batch_size, active_node);
+    clock_t end5 = clock();
+    step5 = double(end5 - begin5) / CLOCKS_PER_SEC;
+    time_c[3] += step5;
 #endif
   }
 };

@@ -19,7 +19,8 @@ limitations under the License. */
 #include "paddle/fluid/operators/math/detail/gru_kernel.h"
 
 DECLARE_int32(paddle_num_threads);
-
+int iteration=0;
+extern std::vector<double> time_c;
 namespace paddle {
 namespace operators {
 
@@ -348,19 +349,25 @@ class GRUCPUKernel : public framework::OpKernel<T> {
         gru_value.output_value = hidden_t.data<T>();
         gru_value.gate_value = gate_t.data<T>();
         gru_value.reset_output_value = reset_hidden_prev_t.data<T>();
-
         math::GRUUnitFunctor<DeviceContext, T>::compute(
             dev_ctx, gru_value, frame_size, cur_batch_size, active_node,
             active_gate);
 
         gru_value.prev_out_value = gru_value.output_value;
       }
+     if (iteration > 100){
+         std::cout <<"step2: "<<time_c[0]<< std::endl;
+         std::cout <<"step3: "<<time_c[1]<< std::endl;
+         std::cout <<"step4: "<<time_c[2]<< std::endl;
+         std::cout <<"step5: "<<time_c[3]<< std::endl;
+       }
 #ifdef PADDLE_WITH_MKLML
     }
 #endif
     math::Batch2LoDTensorFunctor<DeviceContext, T> to_seq;
     batch_hidden->set_lod(batch_gate->lod());
     to_seq(dev_ctx, *batch_hidden, hidden);
+    iteration++;
   }
 
   void Compute(const framework::ExecutionContext& context) const override {
