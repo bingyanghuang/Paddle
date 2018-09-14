@@ -158,8 +158,6 @@ void TestChineseNERPrediction(bool use_analysis, int num_threads) {
   config.device = 0;
   config.specify_input_name = true;
 
-  std::vector<PaddleTensor> input_slots, outputs;
-  std::unique_ptr<PaddlePredictor> predictor;
   Timer timer;
     AnalysisConfig cfg;
     cfg.prog_file = FLAGS_infer_model + "/__model__";
@@ -170,7 +168,6 @@ void TestChineseNERPrediction(bool use_analysis, int num_threads) {
     cfg.enable_ir_optim = true;
 
   if (FLAGS_test_all_data) {
-    LOG(INFO) << "test all data";
     double sum = 0;
     size_t num_samples;
     std::vector<struct PredictStats> stats;
@@ -182,16 +179,14 @@ void TestChineseNERPrediction(bool use_analysis, int num_threads) {
     DataRecord data(FLAGS_infer_data, FLAGS_batch_size);
   
     for (int tid = 0; tid < num_threads; ++tid) {
-    std::vector<PaddleTensor> input_slots, outputs_slots;
-    predictors.emplace_back(
-        use_analysis
-            ? CreatePaddlePredictor<AnalysisConfig,
-                                    PaddleEngineKind::kAnalysis>(cfg)
-            : CreatePaddlePredictor<NativeConfig, PaddleEngineKind::kNative>(
-                  config));
+        predictors.emplace_back(
+            use_analysis
+                ? CreatePaddlePredictor<AnalysisConfig,
+                               PaddleEngineKind::kAnalysis>(cfg)
+                : CreatePaddlePredictor<NativeConfig, PaddleEngineKind::kNative>(
+                      config));
     }
     for (int tid = 0; tid < num_threads; ++tid) {
-        LOG(INFO)<<"tid thread: "<<tid; 
         threads.emplace_back([&, tid]() {
         std::vector<PaddleTensor> input_slots, outputs_slots;
         PrepareInputs(&input_slots, &data, FLAGS_batch_size, 0);
@@ -200,7 +195,7 @@ void TestChineseNERPrediction(bool use_analysis, int num_threads) {
             for (size_t bid = 0; bid < num_samples / FLAGS_batch_size; ++bid) {
                 PrepareInputs(&input_slots, &data, FLAGS_batch_size,bid);
                 timer.tic();
-                predictors[tid]->Run(input_slots, &outputs);
+                predictors[tid]->Run(input_slots, &outputs_slots);
                 sum += timer.toc();
             }
         }
@@ -214,7 +209,6 @@ void TestChineseNERPrediction(bool use_analysis, int num_threads) {
   }
   for (int i = 0; i < num_threads; ++i) {
     threads[i].join();
-    LOG(INFO)<<"wait thread: "<<i;
   }
    // collect statistic data
   int64_t total_samples = std::accumulate(
