@@ -98,6 +98,7 @@ class TestPool3d_Op(OpTest):
     def setUp(self):
         self.op_type = "pool3d"
         self.use_cudnn = False
+        self.use_mkldnn = False
         self.dtype = np.float32
         self.init_test_case()
         self.init_global_pool()
@@ -121,6 +122,7 @@ class TestPool3d_Op(OpTest):
             'pooling_type': self.pool_type,
             'global_pooling': self.global_pool,
             'use_cudnn': self.use_cudnn,
+            'use_mkldnn': self.use_mkldnn,
             'ceil_mode': self.ceil_mode,
             'data_format':
             'AnyLayout',  # TODO(dzhwinter) : should be fix latter

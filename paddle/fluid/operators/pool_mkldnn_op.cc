@@ -96,7 +96,7 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
     }
 
     // Only 2D pooling is supported now
-    PADDLE_ENFORCE(ksize.size() == 2, "ksize must be 2D, i.e. 2D pooling");
+    //PADDLE_ENFORCE(ksize.size() == 2, "ksize must be 2D, i.e. 2D pooling");
     PADDLE_ENFORCE(pooling_type == "max" || pooling_type == "avg",
                    "pooling_type must be 'max' or 'avg'");
     PADDLE_ENFORCE(input->dims().size() == 4,
@@ -110,7 +110,13 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
 
     auto input_format = input->format();
     memory::format output_format{memory::format::format_undef};
-
+    if (input->dims().size() == 5){
+        if (input_format == mkldnn::memory::format::nchw) {
+            input_format = mkldnn::memory::format::ncdhw;
+      } else if (input_format == mkldnn::memory::format::nhwc) {
+            input_format = mkldnn::memory::format::ndhwc;
+      }
+   }
     const std::string key = gethash(src_tz, pooling_type, ksize, strides,
                                     paddings, ctx.op().Output("Out"));
     const std::string key_pool_p = key + "@pool_p";
@@ -413,4 +419,9 @@ namespace ops = paddle::operators;
 REGISTER_OP_KERNEL(pool2d, MKLDNN, ::paddle::platform::CPUPlace,
                    ops::PoolMKLDNNOpKernel<float>);
 REGISTER_OP_KERNEL(pool2d_grad, MKLDNN, ::paddle::platform::CPUPlace,
+                   ops::PoolMKLDNNGradOpKernel<float>);
+
+REGISTER_OP_KERNEL(pool3d, MKLDNN, ::paddle::platform::CPUPlace,
+                   ops::PoolMKLDNNOpKernel<float>);
+REGISTER_OP_KERNEL(pool3d_grad, MKLDNN, ::paddle::platform::CPUPlace,
                    ops::PoolMKLDNNGradOpKernel<float>);
