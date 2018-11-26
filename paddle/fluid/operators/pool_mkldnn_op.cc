@@ -99,8 +99,8 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
     //PADDLE_ENFORCE(ksize.size() == 2, "ksize must be 2D, i.e. 2D pooling");
     PADDLE_ENFORCE(pooling_type == "max" || pooling_type == "avg",
                    "pooling_type must be 'max' or 'avg'");
-    PADDLE_ENFORCE(input->dims().size() == 4,
-                   "Input dim must be with 4, i.e. NCHW");
+    PADDLE_ENFORCE(input->dims().size() == 4 || input->dims().size() == 5,
+                   "Input dim must be with 4 or 5, i.e. NCHW, NCDHW");
 
     const T* input_data = input->data<T>();
     T* output_data = output->mutable_data<T>(ctx.GetPlace());
@@ -423,5 +423,3 @@ REGISTER_OP_KERNEL(pool2d_grad, MKLDNN, ::paddle::platform::CPUPlace,
 
 REGISTER_OP_KERNEL(pool3d, MKLDNN, ::paddle::platform::CPUPlace,
                    ops::PoolMKLDNNOpKernel<float>);
-REGISTER_OP_KERNEL(pool3d_grad, MKLDNN, ::paddle::platform::CPUPlace,
-                   ops::PoolMKLDNNGradOpKernel<float>);
