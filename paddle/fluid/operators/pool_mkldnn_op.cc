@@ -107,10 +107,12 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
 
     std::vector<int> src_tz = paddle::framework::vectorize2int(input->dims());
     std::vector<int> dst_tz = paddle::framework::vectorize2int(output->dims());
+    bool pool_2d = true;    
 
     auto input_format = input->format();
     memory::format output_format{memory::format::format_undef};
     if (input->dims().size() == 5){
+        pool_2d = false;        
         if (input_format == mkldnn::memory::format::nchw) {
             input_format = mkldnn::memory::format::ncdhw;
       } else if (input_format == mkldnn::memory::format::nhwc) {
@@ -167,7 +169,7 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
                                                    *dst_memory);
       } else {
         std::shared_ptr<mkldnn::memory> workspace_memory =
-            CreateWorkspaceMemory(pool_pd, pooling_type, mkldnn_engine);
+            CreateWorkspaceMemory(pool_pd, pooling_type,pool_2d, mkldnn_engine);
 
         // save pool_workspace_memory to be referred in backward path
         dev_ctx.SetBlob(key_pool_workspace_memory, workspace_memory);
@@ -230,14 +232,19 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
 
   std::unique_ptr<mkldnn::memory> CreateWorkspaceMemory(
       std::shared_ptr<mkldnn::pooling_forward::primitive_desc> pool_pd,
-      const std::string& pooling_type, const mkldnn::engine& engine) const {
+      const std::string& pooling_type,bool pool_2d, const mkldnn::engine& engine) const {
     mkldnn::memory::primitive_desc workspace_md =
         pooling_type == "max"
             ? pool_pd->workspace_primitive_desc()
-            : mkldnn::memory::primitive_desc({{},
-                                              platform::MKLDNNGetDataType<T>(),
-                                              mkldnn::memory::format::nchw},
-                                             engine);
+            : pool_2d == true 
+                  ? mkldnn::memory::primitive_desc({{},
+                                    platform::MKLDNNGetDataType<T>(),
+                                    mkldnn::memory::format::nchw},
+                                    engine)
+                  : mkldnn::memory::primitive_desc({{},
+                                    platform::MKLDNNGetDataType<T>(),
+                                    mkldnn::memory::format::ncdhw},
+                                    engine);
 
     auto p_workspace_memory = new mkldnn::memory(workspace_md);
     return std::unique_ptr<mkldnn::memory>(p_workspace_memory);
