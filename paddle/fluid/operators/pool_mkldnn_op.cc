@@ -111,6 +111,8 @@ class PoolMKLDNNOpKernel : public paddle::framework::OpKernel<T> {
 
     auto input_format = input->format();
     memory::format output_format{memory::format::format_undef};
+
+    //pool3d format transform
     if (input->dims().size() == 5){
         pool_2d = false;        
         if (input_format == mkldnn::memory::format::nchw) {
@@ -272,6 +274,21 @@ class PoolMKLDNNGradOpKernel : public paddle::framework::OpKernel<T> {
     PADDLE_ENFORCE(
         !ctx.Attr<bool>("is_test"),
         "is_test attribute should be set to False in training phase.");
+   
+    //pool3d input format transform
+    auto in_x_format = in_x->format();
+    auto out_grad_format = out_grad->format();
+    if (in_x->dims().size() == 5){
+        if (in_x_format == mkldnn::memory::format::nchw) {
+            in_x_format = mkldnn::memory::format::ncdhw;
+      } else if (in_x_format == mkldnn::memory::format::nhwc) {
+            in_x_format = mkldnn::memory::format::ndhwc;
+      } else if(out_grad_format == mkldnn::memory::format::nchw) {
+            out_grad_format = mkldnn::memory::format::ncdhw;
+      } else if (out_grad_format == mkldnn::memory::format::nhwc) {
+            out_grad_format = mkldnn::memory::format::ndhwc;
+      }
+   }
 
     std::string pooling_type = ctx.Attr<std::string>("pooling_type");
     std::vector<int> ksize = ctx.Attr<std::vector<int>>("ksize");
@@ -312,7 +329,7 @@ class PoolMKLDNNGradOpKernel : public paddle::framework::OpKernel<T> {
         key + "@pool_workspace_memory";
 
     auto user_diff_dst_memory =
-        memory({{{diff_dst_tz}, memory::data_type::f32, out_grad->format()},
+        memory({{{diff_dst_tz}, memory::data_type::f32, out_grad_format},
                 mkldnn_engine},
                to_void_cast<T>(out_grad_data));
 
@@ -430,3 +447,6 @@ REGISTER_OP_KERNEL(pool2d_grad, MKLDNN, ::paddle::platform::CPUPlace,
 
 REGISTER_OP_KERNEL(pool3d, MKLDNN, ::paddle::platform::CPUPlace,
                    ops::PoolMKLDNNOpKernel<float>);
+REGISTER_OP_KERNEL(pool3d_grad, MKLDNN, ::paddle::platform::CPUPlace,
+                   ops::PoolMKLDNNGradOpKernel<float>);
+
