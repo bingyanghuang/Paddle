@@ -51,6 +51,11 @@ struct CBlas<float> {
   static void GEMM_FREE(ARGS... args) {
     platform::dynload::cblas_sgemm_free(args...);
   }
+  
+  template <typename... ARGS>
+  static void GEMM_S8U8(ARGS... args) {
+    platform::dynload::cblas_gemm_s8u8s32(args...);
+  }
 
 #ifdef PADDLE_WITH_LIBXSMM
   template <typename... ARGS>
@@ -329,6 +334,15 @@ template <typename T>
 void Blas<platform::CPUDeviceContext>::GEMM_FREE(T *data) const {
   CBlas<T>::GEMM_FREE(data);
 }
+
+template<>
+template <typename T>
+void Blas<platform::CPUDeviceContext>::GEMM_S8U8(CBLAS_TRANSPOSE transA,
+                                            CBLAS_TRANSPOSE transB, int M,
+                                            int N, int K, T alpha, const T *A,const T oa,
+                                            const T *B, const T ob, T beta, const T *C, T *oc) const{
+     CBlas<T>::GEMM_S8U8(CblasRowMajor, transA, transB, M, N, K, alpha, A, K, oa, B, N, ob, beta, C, N, oc);
+}
 #endif
 
 template <>
@@ -557,9 +571,15 @@ template <typename DeviceContext>
 template <typename T>
 void Blas<DeviceContext>::MatMul(const int M, const int N, const int K,
                                  const T *A, const T *B, T *C) const {
-  this->template GEMM<T>(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K,
-                         static_cast<T>(1), A, K, B, N, static_cast<T>(0), C,
-                         N);
+  
+  const int8_t oa =0;
+  const uint8_t ob =0;
+  const int32_t oc_v = 0;
+  const int32_t* oc =0;
+  oc = &oc_v;
+
+  this->template GEMM_S8U8<T>(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K,
+                         static_cast<T>(1), A, oa, B, ob, static_cast<T>(0), C, oc);
 }
 
 template <>

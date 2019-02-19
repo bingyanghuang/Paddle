@@ -29,6 +29,7 @@ inline void FCCompute(const BlasT<DeviceContext, T>& blas, const int M,
   if (B == NULL) {
     return;
   }
+  /*
   if (relu) {
     auto compute = jit::KernelFuncs<jit::kVAddRelu, jit::XYZNTuples<T>,
                                     platform::CPUPlace>::Cache()
@@ -48,7 +49,7 @@ inline void FCCompute(const BlasT<DeviceContext, T>& blas, const int M,
       T* dst = Y + i * N;
       compute(B, dst, dst, N);
     }
-  }
+  }*/
 }
 
 }  // namespace math
