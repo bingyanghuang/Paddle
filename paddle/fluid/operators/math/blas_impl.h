@@ -339,9 +339,9 @@ template<>
 template <typename T>
 void Blas<platform::CPUDeviceContext>::GEMM_S8U8(CBLAS_TRANSPOSE transA,
                                             CBLAS_TRANSPOSE transB, int M,
-                                            int N, int K, T alpha, const T *A,const T oa,
-                                            const T *B, const T ob, T beta, const T *C, T *oc) const{
-     CBlas<T>::GEMM_S8U8(CblasRowMajor, transA, transB, M, N, K, alpha, A, K, oa, B, N, ob, beta, C, N, oc);
+                                            int N, int K, T alpha, const void *A,const MKL_INT8 oa,
+                                            const void *B, const MKL_INT8 ob, T beta, MKL_INT32 *C, MKL_INT32* oc) const{
+     CBlas<T>::GEMM_S8U8(CblasRowMajor, transA, transB, CblasFixOffset, M, N, K, alpha, A, K, oa, B, N, ob, beta, C, N, oc);
 }
 #endif
 
@@ -571,16 +571,26 @@ template <typename DeviceContext>
 template <typename T>
 void Blas<DeviceContext>::MatMul(const int M, const int N, const int K,
                                  const T *A, const T *B, T *C) const {
-  
-  const int8_t oa =0;
-  const uint8_t ob =0;
-  const int32_t oc_v = 0;
-  const int32_t* oc =0;
+
+  this->template GEMM<T>(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K,
+                         static_cast<T>(1), A, K, B, N, static_cast<T>(0), C, N);
+}
+
+template <typename DeviceContext>
+template <typename T>
+void Blas<DeviceContext>::MatMul(const int M, const int N, const int K,
+                                 const void *A, const void *B, MKL_INT32 *C) const {
+
+  const MKL_INT8 oa =0;
+  const MKL_INT8 ob =0;
+  MKL_INT32 oc_v = 0;
+  MKL_INT32* oc =0;
   oc = &oc_v;
 
-  this->template GEMM_S8U8<T>(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K,
+  this->template GEMM_S8U8<T>(CblasNoTrans, CblasNoTrans, M, N, K,
                          static_cast<T>(1), A, oa, B, ob, static_cast<T>(0), C, oc);
 }
+
 
 template <>
 template <typename T>

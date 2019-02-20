@@ -115,11 +115,14 @@ class Blas {
 
   template <typename T>
   void GEMM_S8U8(CBLAS_TRANSPOSE transA, CBLAS_TRANSPOSE transB, int M, int N, int K, 
-                 T alpha, const T* A, T oa, const T*B, T ob, T beta, const T* C,  T *oc) const;
+                 T alpha, const void* A, MKL_INT8 oa, const void* B, MKL_INT8 ob, T beta, MKL_INT32* C, MKL_INT32 *oc) const;
 #endif
   template <typename T>
   void MatMul(const int M, const int N, const int K, const T* A, const T* B, T* C) const;
-
+  
+  template <typename T>
+  void MatMul(const int M, const int N, const int K, const void* A, const void* B, MKL_INT32* C) const;
+  
   template <typename T>
   void MatMul(const framework::Tensor& mat_a, bool trans_a,
               const framework::Tensor& mat_b, bool trans_b, T alpha,

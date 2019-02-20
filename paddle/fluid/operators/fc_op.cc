@@ -174,9 +174,9 @@ class FCOpKernel : public framework::OpKernel<T> {
     framework::Tensor A;
     framework::Tensor B;
     framework::Tensor C;
-    const T* A_data = A.mutable_data<T>(input_dims, platform::CPUPlace());
-    const T* B_data = B.mutable_data<T>(w_dims, platform::CPUPlace());
-    T* C_data = C.mutable_data<T>(out_dims, platform::CPUPlace());
+    const uint8_t* A_data = A.mutable_data<uint8_t>(input_dims, platform::CPUPlace());
+    const int8_t* B_data = B.mutable_data<int8_t>(w_dims, platform::CPUPlace());
+    int32_t* C_data = C.mutable_data<int32_t>(out_dims, platform::CPUPlace());
     
     auto start1 = std::chrono::steady_clock::now();
     //Find the max value of inputs and weights
@@ -188,18 +188,19 @@ class FCOpKernel : public framework::OpKernel<T> {
     float max_weight =0;
     for (int i = 0; i < input_2d[0]; i++ ){
         for(int j = 0; j < input_2d[1]; j++){
-            max_input = std::max(std::abs(input_data[i*input_2d[0]+j]), max_input);
+            max_input = std::max(std::abs(input_data[i*input_2d[1]+j]), max_input);
         }
     }
             
     for (int m = 0; m < w_dims[0]; m++){
         for (int n = 0; n < w_dims[1]; n++) {
-            max_weight = std::max(std::abs(w_data[ m * w_dims[0] + n]), max_weight);
+            max_weight = std::max(std::abs(w_data[ m * w_dims[1] + n]), max_weight);
         }
     }   
     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds> 
                             (std::chrono::steady_clock::now() - start1);
-
+    LOG(INFO)<<"max_input = "<<max_input;
+    LOG(INFO)<<"max_weight = "<<max_weight;
      auto start2 = std::chrono::steady_clock::now();
     //Quantize inputs and weights by calling mkldnn reorder primitive
     auto& dev_ctx = ctx.template device_context<platform::MKLDNNDeviceContext>();
@@ -207,12 +208,11 @@ class FCOpKernel : public framework::OpKernel<T> {
 
     std::vector<primitive> pipeline;
     std::vector<int> src_tz = paddle::framework::vectorize2int(input->dims());
-    std::vector<int> dst_tz = paddle::framework::vectorize2int(input->dims());
 
     mkldnn::primitive_attr attri;
     int mask = 0;
-    attri.set_output_scales(mask, {255/max_input});
-    auto src_md = platform::MKLDNNMemDesc({src_tz[0], src_tz[1], src_tz[2]}, memory::data_type::f32,
+    attri.set_output_scales(mask, {max_input});
+    auto src_md = platform::MKLDNNMemDesc({src_tz}, memory::data_type::f32,
                                           memory::format::ncw);
     auto src_pd = mkldnn::memory::primitive_desc(src_md, engine);
     auto src_memory =
@@ -223,11 +223,11 @@ class FCOpKernel : public framework::OpKernel<T> {
     std::shared_ptr<mkldnn::memory::primitive_desc> dst_pd;
     std::shared_ptr<mkldnn::memory> dst_memory;
     auto dst_md = platform::MKLDNNMemDesc(
-        {dst_tz[0],dst_tz[1],dst_tz[2]}, memory::data_type::u8,
+        {src_tz}, memory::data_type::u8,
         memory::format::ncw);
     ///////////
     dst_pd.reset(new mkldnn::memory::primitive_desc(dst_md, engine));
-    dst_memory.reset(new mkldnn::memory(*dst_pd, to_void_cast<T>(A_data)));
+    dst_memory.reset(new mkldnn::memory(*dst_pd, to_void_cast<uint8_t>(A_data)));
     /////////// 
     auto reorder_pd = std::shared_ptr<reorder::primitive_desc>(
         new reorder::primitive_desc(src_pd, *dst_pd, attri));
@@ -236,10 +236,9 @@ class FCOpKernel : public framework::OpKernel<T> {
     pipeline.push_back(*reorder_p);
     
     std::vector<int> w_src_tz = paddle::framework::vectorize2int(w->dims());
-    std::vector<int> w_dst_tz = paddle::framework::vectorize2int(w->dims());
     mkldnn::primitive_attr w_attri;
-    w_attri.set_output_scales(mask, {127/max_weight});
-    auto w_src_md = platform::MKLDNNMemDesc({w_src_tz[0], w_src_tz[1]}, memory::data_type::f32,
+    w_attri.set_output_scales(mask, {max_weight});
+    auto w_src_md = platform::MKLDNNMemDesc({w_src_tz}, memory::data_type::f32,
                                           memory::format::nc);
     auto w_src_pd = mkldnn::memory::primitive_desc(w_src_md, engine);
     auto w_src_memory =
@@ -249,10 +248,10 @@ class FCOpKernel : public framework::OpKernel<T> {
     std::shared_ptr<mkldnn::memory::primitive_desc> w_dst_pd;
     std::shared_ptr<mkldnn::memory> w_dst_memory;
     auto w_dst_md = platform::MKLDNNMemDesc(
-        {w_dst_tz[0], w_dst_tz[1]}, memory::data_type::s8,
+        {w_src_tz}, memory::data_type::s8,
         mkldnn::memory::format::nc);
     w_dst_pd.reset(new mkldnn::memory::primitive_desc(w_dst_md, engine));
-    w_dst_memory.reset(new mkldnn::memory(*w_dst_pd, to_void_cast<T>(B_data)));
+    w_dst_memory.reset(new mkldnn::memory(*w_dst_pd, to_void_cast<int8_t>(B_data)));
     auto w_reorder_pd = std::shared_ptr<reorder::primitive_desc>(
         new reorder::primitive_desc(w_src_pd, *w_dst_pd, w_attri));
     auto w_reorder_p = std::shared_ptr<reorder>(
@@ -261,10 +260,10 @@ class FCOpKernel : public framework::OpKernel<T> {
     stream(stream::kind::eager).submit(pipeline).wait();
     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds> 
                             (std::chrono::steady_clock::now() - start2);
-
+    
     auto start3 = std::chrono::steady_clock::now();
     auto blas = math::GetBlas<platform::CPUDeviceContext, T>(ctx);
-    math::FCCompute<platform::CPUDeviceContext, T>(
+    math::FCINT8Compute<platform::CPUDeviceContext, T>(
         blas, M, N, K, A_data, B_data, C_data, NULL);
     auto duration3 = std::chrono::duration_cast<std::chrono::microseconds> 
                             (std::chrono::steady_clock::now() - start3);
@@ -273,21 +272,20 @@ class FCOpKernel : public framework::OpKernel<T> {
     //Dequantize the output from int32 to fp32
     std::vector<primitive> pipeline2;
     std::vector<int> out_src_tz = paddle::framework::vectorize2int(out_dims);
-    std::vector<int> out_dst_tz = paddle::framework::vectorize2int(out_dims);
 
     mkldnn::primitive_attr out_attri;
     out_attri.set_output_scales(mask, {1/(max_input*max_weight)});
-    auto out_src_md = platform::MKLDNNMemDesc({out_src_tz[0], out_src_tz[1],out_src_tz[2] }, memory::data_type::s32,
+    auto out_src_md = platform::MKLDNNMemDesc({out_src_tz}, memory::data_type::s32,
                                           mkldnn::memory::format::ncw);
     auto out_src_pd = mkldnn::memory::primitive_desc(out_src_md, engine);
     auto out_src_memory =
-        std::make_shared<mkldnn::memory>(out_src_pd, to_void_cast<T>(C_data));
+        std::make_shared<mkldnn::memory>(out_src_pd, to_void_cast<int32_t>(C_data));
     std::shared_ptr<primitive::at> out_src_memory_p =
         std::shared_ptr<primitive::at>(new primitive::at(*out_src_memory));
     std::shared_ptr<mkldnn::memory::primitive_desc> out_dst_pd;
     std::shared_ptr<mkldnn::memory> out_dst_memory;
     auto out_dst_md = platform::MKLDNNMemDesc(
-        {out_dst_tz[0],out_dst_tz[1],out_dst_tz[2]}, memory::data_type::f32,
+        {out_src_tz}, memory::data_type::f32,
          mkldnn::memory::format::ncw);
     out_dst_pd.reset(new mkldnn::memory::primitive_desc(out_dst_md, engine));
     out_dst_memory.reset(new mkldnn::memory(*out_dst_pd, to_void_cast<T>(output_data)));
@@ -299,7 +297,7 @@ class FCOpKernel : public framework::OpKernel<T> {
     stream(stream::kind::eager).submit(pipeline2).wait();
     auto duration4 = std::chrono::duration_cast<std::chrono::microseconds> 
                             (std::chrono::steady_clock::now() - start4);
-
+    output->set_layout(DataLayout::kNCHW);
     LOG(INFO)<<"Calucate the max value time: "<<duration1.count();
     LOG(INFO)<<"Reorder input and weights time: "<<duration2.count();
     LOG(INFO)<<"FC MKL s8u8 compute time: "<<duration3.count();    

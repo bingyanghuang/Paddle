@@ -28,6 +28,36 @@ inline void FCCompute(const BlasT<DeviceContext, T>& blas, const int M,
   blas.MatMul(M, N, K, X, W, Y);
   if (B == NULL) {
     return;
+  }  
+  if (relu) {
+    auto compute = jit::KernelFuncs<jit::kVAddRelu, jit::XYZNTuples<T>,
+                                    platform::CPUPlace>::Cache()
+                       .At(N);
+    for (int i = 0; i < M; i++) {
+      T* dst = Y + i * N;
+      compute(B, dst, dst, N);
+    }
+  } else {
+    auto compute = jit::KernelFuncs<jit::kVAdd, jit::XYZNTuples<T>,
+                                    platform::CPUPlace>::Cache()
+                       .At(N);
+#ifdef PADDLE_WITH_MKLML
+#pragma omp parallel for
+#endif
+    for (int i = 0; i < M; i++) {
+      T* dst = Y + i * N;
+      compute(B, dst, dst, N);
+    }
+  }
+}
+
+template <typename DeviceContext, typename T>
+inline void FCINT8Compute(const BlasT<DeviceContext, T>& blas, const int M,
+                      const int N, const int K, const void* X, const void* W, MKL_INT32* Y,
+                      const T* B = NULL, bool relu = false) {
+  blas.MatMul(M, N, K, X, W, Y);
+  if (B == NULL) {
+    return;
   }
   /*
   if (relu) {
@@ -51,6 +81,8 @@ inline void FCCompute(const BlasT<DeviceContext, T>& blas, const int M,
     }
   }*/
 }
+
+
 
 }  // namespace math
 }  // namespace operators
