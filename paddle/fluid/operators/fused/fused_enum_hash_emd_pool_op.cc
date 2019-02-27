@@ -33,17 +33,8 @@ class FusedEnumHashEmdPoolOp : public framework::OperatorWithKernel {
         ctx->HasInput("W1"),
         "Input(W2) of FusedEnumHashEmdPool operator should not be null.");
     PADDLE_ENFORCE(
-        ctx->HasOutput("Out0"),
+        ctx->HasOutput("Out"),
         "Output(Out1) of FusedEnumHashEmdPool operator should not be null.");
-    PADDLE_ENFORCE(
-        ctx->HasOutput("Out1"),
-        "Output(Out2) of FusedEnumHashEmdPool operator should not be null.");
-    PADDLE_ENFORCE(
-        ctx->HasOutput("Out2"),
-        "Output(Out3) of FusedEnumHashEmdPool operator should not be null.");
-    PADDLE_ENFORCE(
-        ctx->HasOutput("Out3"),
-        "Output(Out4) of FusedEnumHashEmdPool operator should not be null.");
 
     const auto x_dims = ctx->GetInputDim("X");
     PADDLE_ENFORCE_EQ(
@@ -53,56 +44,48 @@ class FusedEnumHashEmdPoolOp : public framework::OperatorWithKernel {
                       "Input(X) of FusedEnumHashEmdPool operator's 2nd "
                       "dimension should be 1.");
 
-    std::map<std::string, std::string> map;
-    map.insert(std::make_pair("Out0", "W0"));
-    map.insert(std::make_pair("Out1", "W1"));
-    map.insert(std::make_pair("Out2", "W1"));
-    map.insert(std::make_pair("Out3", "W1"));
-    for (auto it = map.begin(); it != map.end(); it++) {
-      std::string table = it->second;
-      std::string output = it->first;
-      auto table_dims = ctx->GetInputDim(table);
-      PADDLE_ENFORCE_EQ(table_dims.size(), 2);
+    std::string input_name = "X";
+    std::string output_name = "Out";
 
-      int64_t last_dim = table_dims[1];
-      std::string input_name = "X";
-      // auto input_dims = ctx->GetInputDim(input_name);
-      // for (int i = 1; i != input_dims.size(); ++i) {
-      //  last_dim *= input_dims[i];
-      if (table != "W0") {
-        const auto num_hash = ctx->Attrs().Get<std::vector<int>>("num_hash");
-        auto idx = std::distance(map.begin(), it);
-        idx = std::min(static_cast<int>(num_hash.size() - 1),
-                       std::max(0, static_cast<int>(idx - 1)));
-        last_dim *= num_hash[idx];
-      }
+    auto table0_dims = ctx->GetInputDim("W0");
+    PADDLE_ENFORCE_EQ(table0_dims.size(), 2);
 
-      if (ctx->IsRuntime()) {
-        framework::Variable* ids_var = boost::get<framework::Variable*>(
-            ctx->GetInputVarPtrs(input_name)[0]);
-        const auto& ids_lod = ids_var->Get<LoDTensor>().lod();
+    int64_t last_dim = table0_dims[1];
+    auto table1_dims = ctx->GetInputDim("W1");
+    PADDLE_ENFORCE_EQ(table1_dims.size(), 2);
 
-        // in run time, the LoD of ids must be 1
-        PADDLE_ENFORCE(ids_lod.size(), 1u,
-                       "The LoD level of Input(Ids) must be 1");
-        PADDLE_ENFORCE_GE(ids_lod[0].size(), 1u, "The LoD could NOT be empty");
+    const auto num_hash = ctx->Attrs().Get<std::vector<int>>("num_hash");
+    int max_num_hash = *std::max_element(num_hash.begin(), num_hash.end());
 
-        int64_t batch_size = ids_lod[0].size() - 1;
+    PADDLE_ENFORCE_EQ(table0_dims[1], table1_dims[1] * max_num_hash);
 
-        // in run time, the shape from Ids -> output
-        // should be [seq_length, 1] -> [batch_size, embedding_size]
-        ctx->SetOutputDim(output, framework::make_ddim({batch_size, last_dim}));
-      } else {
-        // in compile time, the lod level of ids must be 1
-        framework::VarDesc* ids_desc = boost::get<framework::VarDesc*>(
-            ctx->GetInputVarPtrs(input_name)[0]);
-        PADDLE_ENFORCE_EQ(ids_desc->GetLoDLevel(), 1);
+    if (ctx->IsRuntime()) {
+      framework::Variable* ids_var =
+          boost::get<framework::Variable*>(ctx->GetInputVarPtrs(input_name)[0]);
+      const auto& ids_lod = ids_var->Get<LoDTensor>().lod();
 
-        // in compile time, the shape from Ids -> output
-        // should be [-1, 1] -> [-1, embedding_size]
-        ctx->SetOutputDim(output, framework::make_ddim({-1, last_dim}));
-      }
+      // in run time, the LoD of ids must be 1
+      PADDLE_ENFORCE(ids_lod.size(), 1u,
+                     "The LoD level of Input(Ids) must be 1");
+      PADDLE_ENFORCE_GE(ids_lod[0].size(), 1u, "The LoD could NOT be empty");
+
+      int64_t batch_size = ids_lod[0].size() - 1;
+
+      // in run time, the shape from Ids -> output
+      // should be [seq_length, 1] -> [batch_size, embedding_size]
+      ctx->SetOutputDim(output_name,
+                        framework::make_ddim({batch_size, last_dim}));
+    } else {
+      // in compile time, the lod level of ids must be 1
+      framework::VarDesc* ids_desc =
+          boost::get<framework::VarDesc*>(ctx->GetInputVarPtrs(input_name)[0]);
+      PADDLE_ENFORCE_EQ(ids_desc->GetLoDLevel(), 1);
+
+      // in compile time, the shape from Ids -> output
+      // should be [-1, 1] -> [-1, embedding_size]
+      ctx->SetOutputDim(output_name, framework::make_ddim({-1, last_dim}));
     }
+    ctx->ShareLoD("X", /*->*/ "Out");
   }
 
  protected:
@@ -125,10 +108,7 @@ class FusedEnumHashEmdPoolOpMaker : public framework::OpProtoAndCheckerMaker {
     AddInput("W1",
              "(Tensor) The input represents embedding tensors, "
              "which is a learnable parameter.");
-    AddOutput("Out0", "The lookup results, which have the same type as W1.");
-    AddOutput("Out1", "The lookup results, which have the same type as W2.");
-    AddOutput("Out2", "The lookup results, which have the same type as W2.");
-    AddOutput("Out3", "The lookup results, which have the same type as W2.");
+    AddOutput("Out", "(Tensor) The output tensor of sum operator.");
     AddAttr<std::vector<int>>("win_size",
                               "(vector<int>) "
                               "the length of each output along the "
