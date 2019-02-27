@@ -860,7 +860,7 @@ PDNode *patterns::FC::operator()(paddle::framework::ir::PDNode *x,
 }
 
 PDNode *patterns::FusedHash::operator()(paddle::framework::ir::PDNode *x) {
- // Create shared nodes.
+    
     x->assert_is_op_output("feed", "Out");
     
     auto *seq_ent = pattern->NewNode(seq_ent_repr())
@@ -921,6 +921,8 @@ PDNode *patterns::FusedPyrd::operator()(paddle::framework::ir::PDNode *x) {
     auto *seq_pool = pattern->NewNode(fused_emb_seq_pool_repr())
                              ->assert_is_op("fused_embedding_seq_pool");
 
+    auto *sum = pattern->NewNode(sum_repr())
+                             ->assert_is_op("sum");
 
     auto *fh_emb1_var = pattern->NewNode(emb1_repr())
                         ->AsInput()
@@ -946,7 +948,6 @@ PDNode *patterns::FusedPyrd::operator()(paddle::framework::ir::PDNode *x) {
 
     auto *fused_hash2_out =  pattern->NewNode(Out2_repr())
                                      ->assert_is_op_output("fused_hash", "Out")
-                                     //->assert_is_op_nth_input("sum","X",3);
                                      ->assert_more([&](Node *node){
                                         for(auto *in_op : node->inputs){
                                            int win_size;
@@ -958,7 +959,6 @@ PDNode *patterns::FusedPyrd::operator()(paddle::framework::ir::PDNode *x) {
 
     auto *fused_hash3_out =  pattern->NewNode(Out3_repr())
                                      ->assert_is_op_output("fused_hash", "Out")
-                                     //->assert_is_op_nth_input("sum","X",4);
                                      ->assert_more([&](Node *node){
                                         for(auto *in_op : node->inputs){
                                            int win_size;
@@ -973,18 +973,32 @@ PDNode *patterns::FusedPyrd::operator()(paddle::framework::ir::PDNode *x) {
                                  ->AsOutput()
                                  ->assert_is_op_output("fused_embedding_seq_pool","Out");
 
+    auto *sum_out = pattern->NewNode(sum_out_repr())
+                           ->AsOutput()
+                           ->assert_is_op_output("sum");
+
+    fused_hash1_out->AsIntermediate()->assert_is_op_input("sum");
+    fused_hash2_out->AsIntermediate()->assert_is_op_input("sum");
+    fused_hash3_out->AsIntermediate()->assert_is_op_input("sum");
+    seq_pool_out->AsIntermediate()->assert_is_op_input("sum");
+   
     fused_hash1->LinksFrom({x, fh_emb2_var}).LinksTo({fused_hash1_out});
     fused_hash2->LinksFrom({x, fh_emb2_var}).LinksTo({fused_hash2_out});
     fused_hash3->LinksFrom({x, fh_emb2_var}).LinksTo({fused_hash3_out});
     seq_pool->LinksFrom({x, fh_emb1_var}).LinksTo({seq_pool_out});
+    sum->LinksFrom({fused_hash1_out,fused_hash2_out,fused_hash3_out,seq_pool_out}).LinksTo({sum_out});
 
-
-    return fused_hash1_out;
+    return sum_out;
 
 }
+PDNode *patterns::RmSum::operator()(PDNode *x){
 
+    auto *sum = pattern->NewNode(sum_repr())
+                       ->assert_is_op("sum")
+                       ->assert_op_has_n_inputs("sum", 0);
+    return sum;
 
-
+};
 
 PDNode *patterns::Embedding::operator()(PDNode *x) {
   x->assert_is_op_input("lookup_table", "Ids");

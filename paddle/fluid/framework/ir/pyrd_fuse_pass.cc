@@ -41,21 +41,20 @@ std::unique_ptr<ir::Graph> FusePyrdPass::ApplyImpl(
   auto handler = [&](const GraphPatternDetector::subgraph_t& subgraph,
                      Graph* g) {
     VLOG(4) << "handle Fuse Pyramid fuse";
-    //GET_IR_NODE_FROM_SUBGRAPH(emb1, embwithvsum, fuse_pyrd_pattern);
+    GET_IR_NODE_FROM_SUBGRAPH(emb1, emb1, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(emb2, emb2, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(out1, Out1, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(out2, Out2, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(out3, Out3, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(out4, Out4, fuse_pyrd_pattern);
-
-    GET_IR_NODE_FROM_SUBGRAPH(emb1, emb1, fuse_pyrd_pattern);
-
+    GET_IR_NODE_FROM_SUBGRAPH(sum_out, sum_out, fuse_pyrd_pattern);
+    
     GET_IR_NODE_FROM_SUBGRAPH(fused_hash1, fused_hash1, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(fused_hash2, fused_hash2, fuse_pyrd_pattern);
     GET_IR_NODE_FROM_SUBGRAPH(fused_hash3, fused_hash3, fuse_pyrd_pattern);
 
     GET_IR_NODE_FROM_SUBGRAPH(fuse_emb_seq_pool, fused_emb_seq_pool, fuse_pyrd_pattern);
-    
+    GET_IR_NODE_FROM_SUBGRAPH(sum, sum, fuse_pyrd_pattern);
 
 
     // Create an FC Node.
@@ -63,10 +62,7 @@ std::unique_ptr<ir::Graph> FusePyrdPass::ApplyImpl(
     std::string fp_x_in = subgraph.at(x)->Name();
     std::string fp_emb1_in = emb1->Name();
     std::string fp_emb2_in = emb2->Name();
-    std::string fp_out1 = out1->Name();
-    std::string fp_out2 = out2->Name();
-    std::string fp_out3 = out3->Name();
-    std::string fp_out4 = out4->Name();
+    std::string fp_out = sum_out->Name();
 
     //mod_by.push_back(boost::get<int>(hash3->Op()->GetAttr("mod_by")));
 
@@ -74,10 +70,7 @@ std::unique_ptr<ir::Graph> FusePyrdPass::ApplyImpl(
     desc.SetInput("X", std::vector<std::string>({fp_x_in}));
     desc.SetInput("W0", std::vector<std::string>({fp_emb1_in}));
     desc.SetInput("W1", std::vector<std::string>({fp_emb2_in}));
-    desc.SetOutput("Out0", std::vector<std::string>({fp_out1}));
-    desc.SetOutput("Out1", std::vector<std::string>({fp_out2}));
-    desc.SetOutput("Out2", std::vector<std::string>({fp_out3}));
-    desc.SetOutput("Out3", std::vector<std::string>({fp_out4}));
+    desc.SetOutput("Out", std::vector<std::string>({fp_out}));
 
     std::vector<int> win_size;
     std::vector<int> mod_by;
@@ -102,20 +95,18 @@ std::unique_ptr<ir::Graph> FusePyrdPass::ApplyImpl(
     
     desc.SetType("fused_enum_hash_emd_pool");
     auto fp_node = g->CreateOpNode(&desc);  // OpDesc will be copied.
-    GraphSafeRemoveNodes(graph.get(), {fused_hash1, fused_hash2, fused_hash3, fuse_emb_seq_pool});
+    GraphSafeRemoveNodes(graph.get(), {fused_hash1, fused_hash2, fused_hash3, fuse_emb_seq_pool,
+                                       out1, out2, out3,out4});
 
     PADDLE_ENFORCE(subgraph.count(x));
     IR_NODE_LINK_TO(subgraph.at(x), fp_node);
     IR_NODE_LINK_TO(emb1, fp_node);
     IR_NODE_LINK_TO(emb2, fp_node);
-    IR_NODE_LINK_TO(fp_node, out1);
-    IR_NODE_LINK_TO(fp_node, out2);
-    IR_NODE_LINK_TO(fp_node, out3);
-    IR_NODE_LINK_TO(fp_node, out4);
-
+    IR_NODE_LINK_TO(fp_node, sum_out);
 
     found_fp_count++;
   };
+
 
   gpd(graph.get(), handler);
 

@@ -526,6 +526,7 @@ struct FusedPyrd : public PatternBase {
      PATTERN_DECL_NODE(fused_hash2);
      PATTERN_DECL_NODE(fused_hash3);
      PATTERN_DECL_NODE(fused_emb_seq_pool);
+     PATTERN_DECL_NODE(sum);
   //
   // declare variable node's name
      PATTERN_DECL_NODE(emb1);
@@ -534,9 +535,16 @@ struct FusedPyrd : public PatternBase {
      PATTERN_DECL_NODE(Out2);
      PATTERN_DECL_NODE(Out3);
      PATTERN_DECL_NODE(Out4);
+     PATTERN_DECL_NODE(sum_out);
  };
-  
 
+struct RmSum : public PatternBase {
+  RmSum(PDPattern* pattern, const std::string& name_scope)
+      : PatternBase(pattern, name_scope, "remove_sum") {}
+  PDNode* operator()(PDNode* x);
+
+  PATTERN_DECL_NODE(sum);
+};
 // Embedding
 struct Embedding : public PatternBase {
   Embedding(PDPattern* pattern, const std::string& name_scope)
