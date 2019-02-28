@@ -54,8 +54,6 @@ class FusedEnumHashEmdPoolOp : public framework::OperatorWithKernel {
     PADDLE_ENFORCE_EQ(x1_dims[1], 1,
                       "Input(X1) of FusedEnumHashEmdPool operator's 2nd "
                       "dimension should be 1.");
-    PADDLE_ENFORCE_EQ(x0_dims[0], x1_dims[0],
-                      "Input(X0)'s dimension should be equal to Input(X1)'s.");
 
     std::string input_name = "X0";
     std::string output_name = "Out";
