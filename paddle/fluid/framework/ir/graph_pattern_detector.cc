@@ -1000,6 +1000,49 @@ PDNode *patterns::RmSum::operator()(PDNode *x){
 
 };
 
+PDNode *patterns::FuseSum::operator()(paddle::framework::ir::PDNode *y) {
+
+    y->assert_is_op_input("softsign", "X");
+
+    auto *fuse_sum1 = pattern->NewNode(fuse_sum1_repr())
+                            ->assert_is_op("fused_enum_hash_emd_pool0");
+
+    auto *fuse_sum2 = pattern->NewNode(fuse_sum2_repr())
+                             ->assert_is_op("fused_enum_hash_emd_pool1");
+
+    auto *fuse_sum1_input = pattern->NewNode(fuse_sum1_input_repr())
+                                   ->assert_is_op_input("fused_enum_hash_emd_pool0","X");
+
+    auto *fuse_sum2_input = pattern->NewNode(fuse_sum2_input_repr())
+                                   ->assert_is_op_input("fused_enum_hash_emd_pool1", "X");
+/*
+    auto *fh_emb1_var = pattern->NewNode(emb21_repr())
+                        ->AsInput()
+                        ->assert_is_op_input("fused_enum_hash_emd_pool0", "W0");
+
+    auto *fh_emb2_var = pattern->NewNode(emb22_repr())
+                        ->AsInput()
+                        ->assert_is_op_input("fused_enum_hash_emd_pool0", "W1");
+
+*/
+
+    auto *fh_emb1_var1 = pattern->NewNode(emb11_repr())
+                        ->AsInput()
+                        ->assert_is_op_input("fused_enum_hash_emd_pool1", "W0");
+
+    auto *fh_emb2_var1 = pattern->NewNode(emb12_repr())
+                        ->AsInput()
+                        ->assert_is_op_input("fused_enum_hash_emd_pool1", "W1");
+
+    
+    
+    fuse_sum1->LinksFrom({fuse_sum1_input,fh_emb1_var1, fh_emb2_var1}).LinksTo({y});
+    fuse_sum2->LinksFrom({fuse_sum2_input, fh_emb1_var1,fh_emb2_var1}).LinksTo({y});
+
+    return y;
+}
+
+
 PDNode *patterns::Embedding::operator()(PDNode *x) {
   x->assert_is_op_input("lookup_table", "Ids");
   auto *lookup_table_op =

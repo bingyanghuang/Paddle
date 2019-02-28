@@ -115,7 +115,8 @@ CpuPassStrategy::CpuPassStrategy() : PassStrategy({}) {
       "identity_scale_op_clean_pass",  //
       "fh_fuse_pass",                  //
       "pyrd_fuse_pass",                //
-      "remove_sum_pass",
+      "remove_sum_pass",               //
+      "fuse_sum_pass",
   });
   use_gpu_ = false;
 }

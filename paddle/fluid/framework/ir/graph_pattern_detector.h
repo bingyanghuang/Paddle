@@ -545,6 +545,24 @@ struct RmSum : public PatternBase {
 
   PATTERN_DECL_NODE(sum);
 };
+
+struct FuseSum : public PatternBase {
+  FuseSum(PDPattern* pattern, const std::string& name_scope)
+      : PatternBase(pattern, name_scope, "remove_sum") {}
+  PDNode* operator()(PDNode* x);
+
+  PATTERN_DECL_NODE(fuse_sum1);
+  PATTERN_DECL_NODE(fuse_sum2);
+  PATTERN_DECL_NODE(emb11);
+  PATTERN_DECL_NODE(emb12);
+  /*PATTERN_DECL_NODE(emb21);
+  PATTERN_DECL_NODE(emb22);
+*/
+  PATTERN_DECL_NODE(fuse_sum1_input);
+  PATTERN_DECL_NODE(fuse_sum2_input);
+
+};
+
 // Embedding
 struct Embedding : public PatternBase {
   Embedding(PDPattern* pattern, const std::string& name_scope)
