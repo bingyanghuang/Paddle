@@ -784,15 +784,24 @@ struct ConvAffineChannel : public PatternBase {
 struct DequantQuantRM : public PatternBase {
   DequantQuantRM(PDPattern* pattern, const std::string& name_scope)
      : PatternBase(pattern, name_scope,"dequant_quant_squash"){}
-  PDNode* operator()(PDNode* int8_out);
+  PDNode* operator()(PDNode* int8_out, int case_);
 
   //declare operator node's name
   PATTERN_DECL_NODE(dequantize);
   PATTERN_DECL_NODE(quantize);
+  PATTERN_DECL_NODE(quantize1);
+  PATTERN_DECL_NODE(quantize2);
+
   PATTERN_DECL_NODE(next_op);
+  PATTERN_DECL_NODE(next_op1);
+  PATTERN_DECL_NODE(next_op2);
+
 
   //declare the variable
   PATTERN_DECL_NODE(quant_out);
+  PATTERN_DECL_NODE(quant1_out);
+  PATTERN_DECL_NODE(quant2_out);
+
   PATTERN_DECL_NODE(dequant_out);
 
   
