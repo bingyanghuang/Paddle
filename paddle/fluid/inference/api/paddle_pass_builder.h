@@ -137,7 +137,8 @@ class CpuPassStrategy : public PassStrategy {
 
   void EnableQuantizer() override {
     if (!use_quantizer_) {
-      passes_.push_back("cpu_quantize_placement_pass");
+      // TODO(wojtuss): enable cpu_quantize_placement_pass when merged
+      /* passes_.push_back("cpu_quantize_placement_pass"); */
     }
     use_quantizer_ = true;
   }
