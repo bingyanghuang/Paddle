@@ -12,18 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .core import *
-from .graph import *
-from .prune import *
-from .distillation import *
-__all__ = [
-    'build_compressor',
-    'CompressPass',
-    'ImitationGraph',
-    'SensitivePruneStrategy',
-    'MagnitudePruner',
-    'RatioPruner',
-    'DistillationStrategy',
-    'FSPDistiller',
-    'L2Distiller',
-]
+from . import distiller
+from .distiller import *
+from . import distillation_strategy
+from .distillation_strategy import *
+
+__all__ = distiller.__all__
+__all__ += distillation_strategy.__all__

@@ -187,6 +187,7 @@ __all__ = [
     'psroi_pool',
     'teacher_student_sigmoid_loss',
     'huber_loss',
+    'fsp_matrix',
     'tree_conv',
     'npair_loss',
 ]
@@ -10766,3 +10767,25 @@ def npair_loss(anchor, positive, labels, l2_reg=0.002):
     celoss = reduce_mean(cross_entropy)
 
     return l2loss + celoss
+
+def fsp_matrix(x, y):
+    """
+    Calculate the fsp matrix.
+    Args:
+        x (Variable): The feature map with shape [batch_size, channel, height, width].
+        y (Variable): The feature map with shape [batch_size, channel, height, width].
+
+    Returns:
+        fsp matrix (Variable): The huber loss with shape [batch_size, 1].
+
+    Examples:
+        .. code-block:: python
+            feature_map_0 = fluid.layers.conv2d(x)
+            feature_map_1 = fluid.layers.conv2d(feature_map_0)
+            loss = fluid.layers.fsp_matrix(feature_map_0, feature_map_1)
+    """
+    helper = LayerHelper('fsp_matrix', **locals())
+    out = helper.create_variable_for_type_inference(dtype=helper.input_dtype(
+        input_param_name='x'))
+    helper.append_op(type='fsp', inputs={'X': x, 'Y': y}, outputs={'Out': out})
+    return out

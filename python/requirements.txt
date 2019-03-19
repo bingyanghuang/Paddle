@@ -11,4 +11,5 @@ graphviz
 six
 funcsigs
 pyyaml
+prettytable
 decorator
