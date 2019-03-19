@@ -235,13 +235,13 @@ void AnalysisConfig::Update() {
 #endif
   }
 
-  // Quantization passes must come after all other optimization passes
+  // Any quantization passes must come after all other optimization passes
   if (use_quantizer_) {
     if (!enable_ir_optim_) {
       LOG(ERROR)
           << "EnableQuantizer() only works when IR optimization is enabled.";
     }
-    pass_builder_->EnableQuantizer();
+    pass_builder()->EnableQuantizer();
   }
 
   // Do not optimize before quantization
