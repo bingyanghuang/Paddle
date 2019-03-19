@@ -17,6 +17,8 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 #include "paddle/fluid/framework/naive_executor.h"
 #include "paddle/fluid/inference/analysis/analyzer.h"
@@ -35,6 +37,14 @@ using inference::analysis::Argument;
 using inference::analysis::Analyzer;
 using framework::proto::ProgramDesc;
 using framework::NaiveExecutor;
+
+/*
+ * Map variable name to tensor of scaling factors scaling it to MAX=1.0.
+ * bool denotes whether quantization of the variable should be done to unsigned
+ * type.
+ */
+using VarQuantScale =
+    std::unordered_map<std::string, std::pair<bool, framework::LoDTensor>>;
 
 /** \brief This predictor is based on the original native predictor with IR and
  * Analysis support.
@@ -68,6 +78,7 @@ class AnalysisPredictor : public PaddlePredictor {
   void CreateFeedFetchVar(framework::Scope *scope);
   void PrepareFeedFetch();
 
+  void PrepareArgument();
   void OptimizeInferenceProgram();
 
   Argument &analysis_argument() { return argument_; }
@@ -80,6 +91,8 @@ class AnalysisPredictor : public PaddlePredictor {
   void SetMkldnnThreadID(int tid);
 
   std::string GetSerializedProgram() const override;
+
+  bool Quantize();
 
  protected:
   // For memory optimization.
@@ -124,7 +137,13 @@ class AnalysisPredictor : public PaddlePredictor {
   FRIEND_TEST(AnalysisPredictor, analysis_off);
   FRIEND_TEST(AnalysisPredictor, analysis_on);
   FRIEND_TEST(AnalysisPredictor, with_gpu);
+
+  friend class QuantizerTest;
 #endif
+
+ private:
+  // Helper class to perform quantization
+  class Quantizer;
 
  private:
   AnalysisConfig config_;
@@ -134,6 +153,7 @@ class AnalysisPredictor : public PaddlePredictor {
   std::shared_ptr<framework::Scope> scope_;
   framework::Scope *sub_scope_{nullptr};
   std::shared_ptr<framework::ProgramDesc> inference_program_;
+  std::unique_ptr<Quantizer> quantizer_;
   std::vector<framework::OpDesc *> feeds_;
   std::map<std::string, size_t> feed_names_;
   // Sorted according to the idx.
@@ -159,6 +179,64 @@ class AnalysisPredictor : public PaddlePredictor {
   bool status_is_cloned_{false};
   bool status_use_gpu_{false};
   bool status_ir_optim_enabled_{false};
+};
+
+class AnalysisPredictor::Quantizer {
+ public:
+  explicit Quantizer(AnalysisPredictor &predictor,  // NOLINT
+                     const std::shared_ptr<QuantizerConfig> &qconfig)
+      : predictor_(predictor), qconfig_(qconfig) {}
+
+  // Execute full quantization procedure.
+  bool Quantize();
+
+#if PADDLE_WITH_TESTING
+  friend class QuantizerTest;
+#endif
+
+ private:
+  // Run single warmup iteration
+  bool RunWarmup() const;
+  // Gather data from variables and calculate scales for them.
+  bool CalculateScales();
+  // Calculate a scale for tensor based on ScaleAlgo rules.
+  void CalculateSingleScale(const std::string &op_name,
+                            const std::string &conn_name,
+                            const std::string &var_name,
+                            const framework::LoDTensor &var_tensor,
+                            bool is_unsigned);
+  void PrepareArgument() const;
+  bool RunQuantizePasses() const;
+  bool SaveModel() const;
+
+  std::vector<int> ExpandQuantizedBins(std::vector<int> quantized_bins,
+                                       std::vector<int> reference_bins) const;
+
+  // Using the KL-divergence method get the most precise scaling factor.
+  std::pair<bool, framework::LoDTensor> GetKLScalingFactor(
+      const framework::LoDTensor &var_tensor, bool is_unsigned) const;
+
+  std::pair<bool, framework::LoDTensor> GetMaxChScalingFactor(
+      const framework::LoDTensor &var_tensor, bool is_unsigned) const;
+
+  std::pair<bool, framework::LoDTensor> GetMaxScalingFactor(
+      const framework::LoDTensor &var_tensor, bool is_unsigned) const;
+
+  // Returns histogram and bin width
+  std::pair<std::vector<int>, float> Histogram(
+      const framework::LoDTensor &var_tensor, float min_val, float max_val,
+      size_t num_bins = 2048) const;
+
+  // Calculate the entropy.
+  float SafeEntropy(std::vector<int> reference_distr_P, int P_sum,
+                    std::vector<int> candidate_distr_Q, int Q_sum) const;
+
+ private:
+  AnalysisPredictor &predictor_;
+  const std::shared_ptr<QuantizerConfig> qconfig_;
+
+  // A map: variable name -> scale
+  VarQuantScale scales_;
 };
 
 }  // namespace paddle
