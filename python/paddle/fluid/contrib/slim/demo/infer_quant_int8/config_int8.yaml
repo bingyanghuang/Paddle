@@ -1,0 +1,14 @@
+version: 1.0
+strategies:
+    strategy_1:
+        class: 'InferQuantStrategy'
+        start_epoch: 0
+        end_epoch: 0
+        dirname: 'output_model'
+        save_as_int8: True
+
+compress_pass:
+    class: 'CompressPass'
+    epoch: 0
+    strategies:
+        - strategy_1
