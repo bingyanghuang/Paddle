@@ -242,7 +242,8 @@ void BindAnalysisConfig(py::module *m) {
            &AnalysisConfig::cpu_math_library_num_threads)
       .def("enable_quantizer", &AnalysisConfig::EnableQuantizer)
       .def("quantizer_enabled", &AnalysisConfig::quantizer_enabled)
-      .def("quantizer_config",&AnalysisConfig::quantizer_config)
+      .def("quantizer_config",&AnalysisConfig::quantizer_config,
+                              py::return_value_policy::reference)
       .def("to_native_config", &AnalysisConfig::ToNativeConfig)
       .def("set_mkldnn_op", &AnalysisConfig::SetMKLDNNOp)
       .def("set_model_buffer", &AnalysisConfig::SetModelBuffer)
@@ -257,14 +258,13 @@ void BindAnalysisConfig(py::module *m) {
 
 void BindQuantizerConfig(py::module *m) {
   py::class_<QuantizerConfig> quantizer_config(*m, "QuantizerConfig");
-
   quantizer_config.def(py::init<const QuantizerConfig &>())
       .def(py::init<>())
       .def("set_scale_algo", (void (QuantizerConfig::*)(const std::string &,
                                                   const std::string &)) 
                             &QuantizerConfig::SetScaleAlgo)
       .def("set_quant_data",(void (QuantizerConfig::*)(
-                                     std::vector<PaddleTensor> &))
+                              std::vector<PaddleTensor> &))
                             &QuantizerConfig::SetWarmupData)
       .def("set_quant_batch_size", &QuantizerConfig::SetWarmupBatchSize)
       .def("set_enabled_op_types",(void (QuantizerConfig::*)(
@@ -284,6 +284,9 @@ void BindAnalysisPredictor(py::module *m) {
             return outputs;
           })
       .def("get_input_tensor", &AnalysisPredictor::GetInputTensor)
+      .def("prepare_argument", &AnalysisPredictor::PrepareArgument)
+      .def("optimize_infercen_program", &AnalysisPredictor::OptimizeInferenceProgram)
+      .def("quantize", &AnalysisPredictor::Quantize)   
       .def("get_output_tensor", &AnalysisPredictor::GetOutputTensor)
       .def("zero_copy_run", &AnalysisPredictor::ZeroCopyRun)
       .def("clone", &AnalysisPredictor::Clone)
