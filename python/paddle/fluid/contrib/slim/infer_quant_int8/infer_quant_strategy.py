@@ -60,7 +60,7 @@ class InferQuantStrategy(Strategy):
             infer_config.switch_ir_optim(True)
             infer_config.disable_gpu
             infer_config.set_model(context.load_model_dir)
-            infer_config.enable_mkldnn
+            infer_config.enable_mkldnn()
             infer_config.pass_builder
             """
             infer_config.pass_builder().set_passes(
