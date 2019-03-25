@@ -42,6 +42,7 @@ static void BindPaddlePredictor(py::module *m);
 static void BindNativeConfig(py::module *m);
 static void BindNativePredictor(py::module *m);
 static void BindAnalysisConfig(py::module *m);
+static void BindQuantizerConfig(py::module *m);
 static void BindAnalysisPredictor(py::module *m);
 
 void BindInferenceApi(py::module *m) {
@@ -53,6 +54,7 @@ void BindInferenceApi(py::module *m) {
   BindNativeConfig(m);
   BindNativePredictor(m);
   BindAnalysisConfig(m);
+  BindQuantizerConfig(m);
   BindAnalysisPredictor(m);
 
   m->def("create_paddle_predictor",
@@ -238,6 +240,9 @@ void BindAnalysisConfig(py::module *m) {
            &AnalysisConfig::SetCpuMathLibraryNumThreads)
       .def("cpu_math_library_num_threads",
            &AnalysisConfig::cpu_math_library_num_threads)
+      .def("enable_quantizer", &AnalysisConfig::EnableQuantizer)
+      .def("quantizer_enabled", &AnalysisConfig::quantizer_enabled)
+      .def("quantizer_config",&AnalysisConfig::quantizer_config)
       .def("to_native_config", &AnalysisConfig::ToNativeConfig)
       .def("set_mkldnn_op", &AnalysisConfig::SetMKLDNNOp)
       .def("set_model_buffer", &AnalysisConfig::SetModelBuffer)
@@ -248,6 +253,23 @@ void BindAnalysisConfig(py::module *m) {
            &AnalysisConfig::SwitchRuntimeContextCache, py::arg("x") = true)
       .def("pass_builder", &AnalysisConfig::pass_builder,
            py::return_value_policy::reference);
+}
+
+void BindQuantizerConfig(py::module *m) {
+  py::class_<QuantizerConfig> quantizer_config(*m, "QuantizerConfig");
+
+  quantizer_config.def(py::init<const QuantizerConfig &>())
+      .def(py::init<>())
+      .def("set_scale_algo", (void (QuantizerConfig::*)(const std::string &,
+                                                  const std::string &)) 
+                            &QuantizerConfig::SetScaleAlgo)
+      .def("set_quant_data",(void (QuantizerConfig::*)(
+                                     std::vector<PaddleTensor> &))
+                            &QuantizerConfig::SetWarmupData)
+      .def("set_quant_batch_size", &QuantizerConfig::SetWarmupBatchSize)
+      .def("set_enabled_op_types",(void (QuantizerConfig::*)(
+                                     std::unordered_set<std::string> &))
+                              &QuantizerConfig::SetEnabledOpTypes);
 }
 
 void BindAnalysisPredictor(py::module *m) {

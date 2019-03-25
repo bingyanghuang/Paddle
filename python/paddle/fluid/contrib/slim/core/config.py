@@ -19,6 +19,7 @@ from collections import OrderedDict
 from ..prune import *
 from ..quantization import *
 from ..distillation import *
+from ..infer_quant_int8 import *
 from .strategy import *
 
 __all__ = ['ConfigFactory']
@@ -91,8 +92,9 @@ class ConfigFactory(object):
                     if 'init_model' in key_values[key]:
                         self.compress_pass['init_model'] = key_values[key][
                             'init_model']
-                    self.compress_pass['checkpoint_path'] = key_values[key][
-                        'checkpoint_path']
+                    if 'checkpoint_path' in key_values[key]:
+                        self.compress_pass['checkpoint_path'] = key_values[key][
+                            'checkpoint_path']
                     if 'strategies' in key_values[key]:
                         for name in key_values[key]['strategies']:
                             strategy = self.instance(name)

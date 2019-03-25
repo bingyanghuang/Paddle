@@ -23,7 +23,7 @@ from paddle.fluid.contrib.slim import ImitationGraph
 
 
 class Model(object):
-    def __init__(slef):
+    def __init__(self):
         pass
 
     def compress(self):
