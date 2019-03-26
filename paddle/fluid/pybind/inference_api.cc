@@ -263,9 +263,11 @@ void BindQuantizerConfig(py::module *m) {
       .def("set_scale_algo", (void (QuantizerConfig::*)(const std::string &,
                                                   const std::string &)) 
                             &QuantizerConfig::SetScaleAlgo)
-      .def("set_quant_data",(void (QuantizerConfig::*)(
-                              std::vector<PaddleTensor> &))
-                            &QuantizerConfig::SetWarmupData)
+      .def("set_quant_data",[](QuantizerConfig &self, const std::vector<PaddleTensor> &data){
+                               auto warmup_data=std::make_shared<std::vector<PaddleTensor>>(data);
+                               self.SetWarmupData(warmup_data);
+                               return;
+                            })
       .def("set_quant_batch_size", &QuantizerConfig::SetWarmupBatchSize)
       .def("set_enabled_op_types",(void (QuantizerConfig::*)(
                                      std::unordered_set<std::string> &))

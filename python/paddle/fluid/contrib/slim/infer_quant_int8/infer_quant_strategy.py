@@ -71,17 +71,17 @@ class InferQuantStrategy(Strategy):
                 "fc_fuse_pass", "is_test_pass"});   
             """
             warmup_data = []   
-            dshape= [3*224*224]
+            dshape= [3, 224, 224]
             for batch_id, data in enumerate(context.eval_reader()):
-                 image = np.array(map(lambda x: x[0].reshape(dshape), data)).astype(
-                     "float32")
-                 image = np.reshape(image, (1, np.product(image.shape))) 
+                 #image = np.array(map(lambda x: x[0].reshape(dshape), data)).astype(
+                    # "float32")
+                 #image = np.reshape(image, (1, np.product(image.shape))) 
                  #label = np.array(map(lambda x: x[1], data)).astype("int64")
                  pre_data=core.PaddleTensor()
                  pre_data.name = "x"
                  pre_data.shape = shape
                  #pre_data.data.resize(50*3*318*318)
-                 pre_data.data = core.PaddleBuf(image[0])
+                 pre_data.data = core.PaddleBuf(data[0])
                  pre_data.dtype = core.PaddleDType.FLOAT32
                  warmup_data.append(pre_data)
                  if batch_id == 0:
