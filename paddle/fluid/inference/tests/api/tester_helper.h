@@ -370,10 +370,15 @@ void TestOneThreadPrediction(
     const std::vector<std::vector<PaddleTensor>> &inputs,
     std::vector<std::vector<PaddleTensor>> *outputs, bool use_analysis = true) {
   auto predictor = CreateTestPredictor(config, use_analysis);
+  std::string optimModelPath =
+      FLAGS_infer_model.substr(0, FLAGS_infer_model.find_last_of("/")) +
+      "/saved_optim_model";
   if (FLAGS_warmup) {
     PredictionWarmUp(predictor.get(), inputs, outputs, 1, 0);
   }
   PredictionRun(predictor.get(), inputs, outputs, 1, 0);
+  (static_cast<AnalysisPredictor *>(predictor.get()))
+      ->SaveOptimModel(optimModelPath);
 }
 
 void TestMultiThreadPrediction(
