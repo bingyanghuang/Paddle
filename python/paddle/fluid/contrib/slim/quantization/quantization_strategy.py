@@ -57,7 +57,7 @@ class QuantizationStrategy(Strategy):
             mobile_model_save_path(str): The path to save model for paddle-mobile execution.
                             None means it doesn't save mobile model. default: None.
             int8_model_save_path(str): The path to save model with int8_t weight.
-                            None means it doesn't save int8 model. default: None.
+                            None means it doesn't save int8 model. defalut: None.
             activation_bits(int): quantization bit number for activation. default: 8.
             weight_bits(int): quantization bit number for weights. The bias is not quantized.
                               default: 8.
